@@ -6,6 +6,23 @@ var sendJSONresponse = function(res, status, content) {
 	res.json(content);
 };
 
+var theEarth = (function() {
+	var earthRadius = 6371; //km
+
+	var getDistanceFromRads = function(rads) {
+		return parseFloat(rads * earthRadius);
+	};
+
+	var getRadsFromDistance = function(distance) {
+		return parseFloat(distance / earthRadius);
+	};
+
+	return {
+		getDistanceFromRads : getDistanceFromRads,
+		getRadsFromDistance : getRadsFromDistance
+	};
+})();
+
 /* GET a location by the id */
 module.exports.locationsReadOne = function(req, res) {
   console.log('Finding location details', req.params);
@@ -32,4 +49,32 @@ module.exports.locationsReadOne = function(req, res) {
       "message": "No locationid in request"
     });
   }
+};
+
+module.exports.locationsListByDistance = function(req, res) {
+	var lng = parseFloat(req.query.lng);
+	var lat = parseFloat(req.query.lat);
+	var point = {
+		type: "Point",
+		coordinates: [lng, lat]
+	};
+	var geoOptions = {
+		spherical: true,
+		maxDistance: theEarth.getRadsFromDistance(20),
+		num: 10
+	};
+	Loc.geoNear(point, geoOptions, function(err, results, stats) {
+		var locations = [];
+		results.forEach(function(doc) {
+			locations.push({
+				distance: theEarth.getDistanceFromRads(doc.dis),
+				name: doc.obj.name,
+				address: doc.obj.address,
+				rating: doc.obj.rating,
+				facilities: doc.obj.facilities,
+				_id: doc.obj._id
+			});
+		});
+		sendJSONresponse(res, 200, locations);
+	});
 };
